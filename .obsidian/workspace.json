@@ -177,11 +177,12 @@
       "bases:Create new base": false
     }
   },
-  "active": "bbe51b2e9b35fc4f",
+  "active": "4ca767faf0245938",
   "lastOpenFiles": [
+    "Untitled.canvas",
     "trading-bot/references/workflows/trailing-manager-code.md",
-    "trading-bot/references/workflows/sl-monitor-code.md",
     "trading-bot/references/workflows/main-nodes.md",
+    "trading-bot/references/workflows/sl-monitor-code.md",
     "trading-bot/references/workflows",
     "trading-bot/workflows",
     "trading-bot/New folder",
