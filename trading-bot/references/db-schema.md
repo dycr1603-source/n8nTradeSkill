@@ -72,7 +72,7 @@ ORDER BY count DESC LIMIT 10;
 ## Comandos útiles
 ```bash
 # Ver trades abiertos sin cierre
-mysql -u tradingbot -p'TradingBot2024!' trading_bot -e "
+mysql -u tradingbot -p'YOUR_DB_PASSWORD' trading_bot -e "
 SELECT t.id, t.symbol, t.direction, t.entry_price, t.status, tc.pnl_usdt, tc.close_reason
 FROM trades t
 LEFT JOIN trade_closes tc ON t.id = tc.trade_id
@@ -80,7 +80,7 @@ WHERE t.status = 'CLOSED' AND tc.pnl_usdt IS NULL
 ORDER BY t.opened_at DESC LIMIT 10;"
 
 # Rechazos últimas 6 horas
-mysql -u tradingbot -p'TradingBot2024!' trading_bot -e "
+mysql -u tradingbot -p'YOUR_DB_PASSWORD' trading_bot -e "
 SELECT direction, skip_reason, COUNT(*) as veces
 FROM trade_rejections
 WHERE rejected_at >= NOW() - INTERVAL 6 HOUR

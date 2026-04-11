@@ -1,296 +1,271 @@
 ---
 name: trading-bot
 description: >
-  Contexto completo del bot de trading de Binance Futures de Delcon. SIEMPRE usa este skill
-  cuando el usuario mencione: n8n, bot de trading, Binance, SL Monitor, Trailing Manager,
-  Agente de Mercado, AI Market Context, Risk Guard, Aggregate Best Setup, Market Scanner,
-  Indicators and Scoring, αтεгυм, dashboard, cooldowns, scoring, threshold, score,
-  LONG/SHORT, posiciones, trades, PnL, ATR, RSI, EMA, 4H, fallbacks, Position Sizer,
-  Execute Trade, Build Trade Alert, Build AI Skip Message, Post-Trade Agent,
-  o cualquier tema relacionado con el bot de crypto. También usa este skill si el usuario
-  pide código JavaScript para n8n, pide revisar un nodo, o menciona el servidor 18.228.14.96.
+  Sistema completo de contexto del bot de trading Binance Futures de Delcon.
+  SIEMPRE usa este skill cuando el usuario mencione: n8n, bot de trading, Binance,
+  SL Monitor, Trailing Manager, Agente de Mercado, AI Market Context, Risk Guard,
+  Aggregate Best Setup, Market Scanner, Indicators and Scoring, αтεгυм, dashboard,
+  cooldowns, scoring, threshold, score, LONG/SHORT, posiciones, trades, PnL, ATR,
+  RSI, EMA, 4H, fallbacks, Position Sizer, Execute Trade, Build Trade Alert,
+  Build AI Skip Message, Post-Trade Agent, chart-api, workflow, nodo,
+  o cualquier código JavaScript para n8n. También activa si el usuario menciona
+  el servidor 18.228.14.96 o pide revisar/modificar cualquier nodo del bot.
+  Este skill contiene el código COMPLETO de todos los nodos — úsalo siempre.
 ---
 
-# Bot de Trading Binance Futures — Contexto Completo
+# Bot de Trading Binance Futures — Sistema Brain Completo
 
-Lee este archivo completo antes de responder cualquier pregunta sobre el bot.
-Para detalles técnicos de nodos específicos, lee los archivos en `references/`.
+Lee las secciones relevantes según lo que necesites.
+Para código completo de nodos, ve a `references/workflows/`.
 
 ---
 
-## Infraestructura
+## INFRAESTRUCTURA
 
 | Componente | Valor |
 |-----------|-------|
 | Servidor | `18.228.14.96` |
-| Dashboard | `:3001` |
-| n8n | `:5678` |
-| Chart API | `:3000` |
-| DB | MariaDB `trading_bot` — user `tradingbot` / pass `TradingBot2024!` |
-| PM2 proceso | `dashboard` |
+| Dashboard | `http://18.228.14.96:3001` |
+| n8n | `http://18.228.14.96:5678` |
+| DB | MariaDB `trading_bot` — user `tradingbot` / pass `YOUR_DB_PASSWORD` |
 | Codebase | `/home/admin/chart-api/` |
 | Telegram | `-1003222176229` |
-| Bot scheduler | cada 30 minutos |
-| Stack | n8n, MariaDB, PM2, Anthropic claude-haiku-4-5-20251001, Binance Futures API |
+| Scheduler | cada 30 minutos |
 
-**API Keys Binance:**
-- `API_KEY: ...`
-- `API_SECRET: ...`
-
-**Anthropic Key:** `...`
-
----
-
-## Arquitectura — Flujo Principal (cada 30 min)
-
+**Credenciales:**
 ```
-Risk Guard
-  ↓ passRisk=true
-Market Scanner (batch 10 símbolos en paralelo)
-  ↓
-Indicators and Scoring (1h + 4h, paralelo)
-  ↓
-Aggregate Best Setup (selecciona top símbolo + fallbacks)
-  ↓
-DETECTOR DE RSI EXTREMO
-  ├── RSI > 75 o ATR > 1.5% → Need Visual Check → AI Market Context Image
-  └── Normal → AI Market Context (sin imagen)
-  ↓
-Position Sizer
-  ↓
-Execute Trade
-  ↓
-Monitor SL Global (activa SL Monitor webhook)
-  ↓
-Build Trade Alert → Telegram
-```
-
-**Workflows paralelos:**
-- **SL Monitor** — cada 10 segundos — monitorea SL, gestión por tiempo en pérdida
-- **Trailing Manager** — cada 1 minuto — mueve SL a BE/LOCK/TRAILING
-- **αтεгυм Intelligence** — genera señal via `/intelligence/signal`
-
----
-
-## Endpoints Dashboard Activos
-
-```
-POST /cooldown/set          — registrar cooldown por símbolo
-GET  /cooldown/status       — cooldowns activos con minutesLeft
-DELETE /cooldown/:symbol    — limpiar cooldown
-GET  /intelligence/signal   — señal consolidada pública
-POST /db/trade/open         — abrir trade en DB
-POST /db/trade/close        — cerrar trade en DB
-POST /db/trade/update-sl    — actualizar SL en DB
-GET  /db/stats              — estadísticas generales
-POST /db/rejection          — registrar rechazo
-POST /db/scan               — registrar scan event
-GET  /cb/status             — circuit breaker status
-POST /cb/sl                 — notificar SL (suma contador)
-POST /cb/tp                 — notificar TP
-POST /cb/reset              — resetear circuit breaker
-POST /trade                 — actualizar trade en dashboard
-DELETE /trade/:symbol       — cerrar trade en dashboard
+Binance API_KEY:    YOUR_BINANCE_API_KEY
+Binance API_SECRET: YOUR_BINANCE_API_SECRET
+Anthropic Key:      YOUR_ANTHROPIC_API_KEY
 ```
 
 ---
 
-## Sistema de Scoring
+## WORKFLOWS
 
-### scoreSignal (Indicators and Scoring)
+### 1. Workflow Principal (cada 30 min)
+**Nodos en orden:**
 ```
-TREND    (40 pts): EMA8 vs EMA21 vs EMA50
-RSI      (25 pts): 
-  - r > 55 && < 70  → L+20
-  - r >= 70         → L+8
-  - r > 50 && <=55  → L+10
-  - r < 45 && > 30  → S+20
-  - r <= 30 && > 20 → S+15  ← fix reciente
-  - r <= 20         → S+10  ← fix reciente
-  - r < 50 && >=45  → S+10
-VOLUME   (20 pts): volRatio vs 20-bar avg
-VWAP     (15 pts): precio vs VWAP
-FUNDING  (10 pts): fundingRate
-OI bonus  (+5):   oiChangePct > 2
-ATR penalty:      > 8% → *0.5, > 5% → *0.75
-
-Dirección: L>=50 && L>S → LONG | S>=50 && S>L → SHORT
-Fix reciente: S>=35 && S>L*1.5 → SHORT (umbral reducido)
-             L>=35 && L>S*1.5 → LONG
-```
-
-### Ajuste 4H
-```
-Signal LONG + trend4hLong → +8 (RSI fuerte) o +4
-Signal LONG + trend4hShort → -20 (CONTRADICTS)
-Signal SHORT + trend4hShort → +8 o +4 (CONFIRMS)
-RSI 4H peligroso (>80 LONG, <20 SHORT) → -15 adicional
+Main Schedule → Risk Guard → AGENTE DE MERCADO → If: Risk OK
+  ├→ [FAIL] Telegram: Risk Halt
+  └→ [OK] Market Scanner → Indicators and Scoring → Aggregate Best Setup
+       └→ If: Setup Found
+            ├→ [NO] Telegram: No Setup
+            └→ [SÍ] DETECTOR DE RSI EXTREMO → Need Visual Check
+                 ├→ [CON IMAGEN] Save Image → Claude Code Command
+                 │    → Parse Output Of Claude → AI Market Context Image
+                 │         → If: AI Approves1
+                 │              ├→ Position Sizer1 → Execute Trade1
+                 │              │    → Monitor SL Global of Image
+                 │              │         → Build Trade Alert of Image
+                 │              │              → Telegram: Trade Opened of Image → Delete Image1
+                 │              └→ Build AI Skip Message Image
+                 │                   → Telegram: AI Skip Image → Delete Image
+                 └→ [SIN IMAGEN] AI Market Context → If: AI Approves
+                      ├→ Position Sizer → Execute Trade → Monitor SL Global
+                      │    → Build Trade Alert → Telegram: Trade Opened
+                      └→ Build AI Skip Message → Telegram: AI Skip Image1
 ```
 
-### Threshold Dinámico (AI Market Context)
+**Triggers adicionales:**
 ```
-macro contradice o 4H CONTRADICTS → 80
-macro alinea + 4H CONFIRMS        → 62
-macro alinea + 4H NEUTRAL         → 64
-macro alinea + 4H CONTRADICTS     → 75
-macro NEUTRAL + 4H CONFIRMS       → 65
-macro NEUTRAL + 4H NEUTRAL        → 70
-default                           → 67
-+ openCount >= 2 → +8
-+ openCount >= 1 → +4
+Daily Trigger AI → Daily Analysis Report + Daily PnL Report → Telegram
+Weekly Trigger   → Weekly Deep Analysis → Telegram
+```
+
+### 2. SL Monitor (cada 10 segundos)
+```
+Schedule Trigger → SL Monitor Code → If (telegramText?)
+                                          ├→ Telegram: SL Updated
+                                          └→ Post-Trade Agent → Telegram: Post-Trade Agent
+Webhooks:
+  GET  /webhook/sl-monitor-get  → Leer Estado
+  POST /webhook/sl-monitor-set  → Guardar Estado
+  POST /webhook/sl-monitor-reset → Reset Estado
+```
+
+### 3. Trailing Manager (cada 1 minuto)
+```
+Schedule Trigger → Trailing Manager Code → If: SL Updated → Telegram: SL Updated
+```
+
+---
+
+## SCORING
+
+### scoreSignal
+```javascript
+// TREND (40pts): EMA8>EMA21 +15, alineación completa +25, spread>1% +5
+// RSI (25pts):
+r>55&&<70→L+20 | r>=70→L+8 | r>50&&<=55→L+10
+r<45&&>30→S+20 | r<=30&&>20→S+15 | r<=20→S+10 | r<50&&>=45→S+10
+// VOLUME (20pts): >=2.0→+15, >=1.5→+10, >=1.2→+6, >=0.8→+2, else→-3
+// VWAP (15pts): diff>0.5%→+15, >0.1%→+8, <-0.5%→+15SHORT, <-0.1%→+8SHORT
+// FUNDING (10pts): >0.0005→S+10, <-0.0005→L+10
+// ATR penalty: >8%→*0.5, >5%→*0.75
+// Dirección: L>=50&&L>S→LONG | S>=50&&S>L→SHORT
+// Fix: S>=35&&S>L*1.5→SHORT | L>=35&&L>S*1.5→LONG
+```
+
+### Threshold Dinámico
+```
+macroContradict || CONTRADICTS → 80
+macroAlign + CONFIRMS          → 62
+macroAlign + NEUTRAL           → 64
+macroAlign + CONTRADICTS       → 75
+NEUTRAL + CONFIRMS             → 65
+NEUTRAL + NEUTRAL              → 70
+default → 67 | +openCount≥2:+8 | +openCount≥1:+4
 Con imagen: -3 (mín 59)
-Volatility bonus: -8 (mín 55) si 0 trades + 5+ cooldowns + ATR>2% + SHORT alineado
+Volatility bonus: -8 (mín 55) si openCount=0+cooldowns≥5+ATR>2%+SHORT alineado
 ```
 
 ---
 
-## Agente de Mercado — Reglas Duras
+## AGENTE DE MERCADO
 
 ```javascript
-F&G < 15 + BTC bajista  → long_ok=false, size=0.6x, bias=BEARISH
-F&G < 15 + BTC alcista  → long_ok=true,  size=0.5x, bias=NEUTRAL
-F&G 15-25               → size=0.5x
-F&G >= 80               → short_ok=false, size=0.7x, bias=BULLISH
-F&G >= 65               → size=0.85x
-Normal                  → size=1.0x
+// Reglas duras en código — Claude solo escribe 'reason'
+F&G<15+BTCbaj → long_ok=false, size=0.6, BEARISH
+F&G<15+BTCalc → long_ok=true,  size=0.5, NEUTRAL
+F&G 15-25     → size=0.5
+F&G>=80       → short_ok=false, size=0.7, BULLISH
+F&G>=65       → size=0.85
+Normal        → size=1.0
+// Consulta GET /intelligence/signal → pasa como intelligenceSignal en marketContext
 ```
-
-**intelligenceSignal** se consulta al endpoint `/intelligence/signal` y se agrega al `marketContext`.
 
 ---
 
-## Sistema de Inteligencia αтεгυм
+## INTELIGENCIA αтεгυм
 
-**Endpoint:** `GET /intelligence/signal`
-
-**Ajustes por señal:**
 ```
-NO OPERAR alta:    -10 ambas
-NO OPERAR media:   -6 ambas
-NO OPERAR baja:    -2 ambas (confianza baja → 0 en AI Context)
-conflict_high:     -12
-conflict_medium:   -7
-confirm_high:      +6
-confirm_medium:    +3
+GET http://18.228.14.96:3001/intelligence/signal
+Señales: LONG, SHORT, NEUTRAL, NO OPERAR
+Ajustes: NO_OPERAR_alta=-10, media=-6, baja=-2(→0 si conf=baja)
+         conflict_high=-12, medium=-7, low=-3
+         confirm_high=+6, medium=+3, low=+1
+confianza media → ajuste*0.6
+hasAdjustment = ifLong!==0 || ifShort!==0
 ```
-
-**En AI Market Context:** confianza baja → intelAdjFinal=0 (ignorado)
 
 ---
 
-## Gestión de Posiciones
+## TRAILING MANAGER — Stages
 
-### Trailing Manager (cada 1 min)
 ```
-1R  → BREAKEVEN: SL a entry ± 0.1%
-1.5R → LOCK: SL a entry ± 0.5R
-2R+ → TRAILING: SL a precio ± ATR*1.0
-TIME_LOCK: si lleva horas con % ganancia sin llegar a R milestones
+INITIAL   → 0R   — SL original
+BREAKEVEN → 1R   — SL = entry ± 0.1%
+TIME_LOCK → horas en ganancia sin alcanzar R milestones
+LOCK      → 1.5R — SL = entry ± 0.5R
+TRAILING  → 2R+  — SL = precio ± ATR*1.0
+
+setSLWithRetry: 3 intentos, 2s entre cada uno
+Dashboard/DB: solo si SL_SET exitoso
+bestPrice: se preserva en Guardar Estado aunque Trailing sobreescriba
 ```
 
-**Fix crítico:** `setSLWithRetry` — 3 intentos con 2s entre cada uno.
-Dashboard y DB solo se actualizan si SL Monitor confirmó el cambio.
-`bestPrice` se preserva en `Guardar Estado` aunque Trailing Manager sobreescriba.
+---
 
-### SL Monitor (cada 10 seg)
-**Gestión por tiempo en pérdida (solo stage INITIAL, nunca tocó ganancia):**
+## SL MONITOR — Gestión por Tiempo
+
 ```
-6h  en pérdida → SL 30% más cerca del entry
-12h en pérdida → SL 50% más cerca del entry
+Solo: stage=INITIAL + nunca tocó ganancia (bestPrice≈entry)
+6h  en pérdida → SL 30% más cerca (slDist*0.70)
+12h en pérdida → SL 50% más cerca (slDist*0.50)
 20h en pérdida → TIME_EXIT (cierre forzado)
-```
 
-### Cooldowns tras cierre
-```
-TP:        30 min
-SL real:   15 min
-TIME_EXIT: 60 min
-Macro block (EDGE/símbolo rechazado): 15 min via dashboard
+Cooldowns: TP=30min | SL=15min | TIME_EXIT=60min | Macro=15min
 ```
 
 ---
 
-## Filtros Importantes
+## FILTROS CRÍTICOS
 
-### AI Market Context Image — lateTrendBlocks
 ```javascript
-// LATE_TREND solo bloquea si NO es SHORT alineado con macro BEARISH
-const lateTrendBlocks = visionLate && !(direction === 'SHORT' && macroBias === 'BEARISH');
-```
+// LATE_TREND (AI Market Context Image)
+const lateTrendBlocks = visionLate && !(direction==='SHORT' && macroBias==='BEARISH');
 
-### RSI peligroso
-```
-Sin imagen: SHORT < 30, LONG > 70
-Con imagen: SHORT < 25, LONG > 75
-```
+// RSI peligroso
+// Sin imagen: SHORT<30, LONG>70
+// Con imagen: SHORT<25, LONG>75
 
-### Macro cooldown en Aggregate Best Setup
-```javascript
-state.macroCooldowns[sym] = Date.now(); // 15 min
-// Excluye símbolo si fue bloqueado por macro en ciclo anterior
-```
+// isHardBlock (no aplica cooldown)
+skipReason.includes('Macro bloquea'||'RSI peligroso'||'Vol spike'||'PARABOLIC'||'Circuit Breaker')
 
----
+// Aggregate filter
+!error && direction!=='NEUTRAL' && score>=45 && !openSymbols && !activeCooldowns && !macroCooldowns
 
-## Estado del SL Monitor
-
-**Webhook GET:** `http://18.228.14.96:5678/webhook/sl-monitor-get`
-**Webhook SET:** `http://18.228.14.96:5678/webhook/sl-monitor-set`
-**Reset:** `http://18.228.14.96:5678/webhook/sl-monitor-reset`
-
-Campos importantes en cada posición:
-```json
-{
-  "positionSide": "SHORT|LONG",
-  "slPrice": 0,
-  "qty": 0,
-  "side": "BUY|SELL",
-  "entryPrice": 0,
-  "initialSL": 0,
-  "stage": "INITIAL|BREAKEVEN|TIME_LOCK|LOCK|TRAILING",
-  "tp": 0,
-  "leverage": 5,
-  "finalScore": 0,
-  "openedAt": 1234567890000,
-  "aiRegime": "TRENDING",
-  "bestPrice": 0
-}
+// AI API error → penalizar, no aprobar
+catch(e){ aiResult.confidence_adjustment = -50; }
 ```
 
 ---
 
-## Bugs Conocidos y Fixes Aplicados
+## ENDPOINTS DASHBOARD
+
+```
+POST   /cooldown/set           {symbol, minutes}
+GET    /cooldown/status
+DELETE /cooldown/:symbol
+GET    /intelligence/signal
+POST   /db/trade/open | /close | /update-sl
+GET    /db/stats
+POST   /db/rejection | /db/scan
+GET    /cb/status
+POST   /cb/sl | /cb/tp | /cb/reset
+POST   /trade
+DELETE /trade/:symbol
+```
+
+---
+
+## WEBHOOKS SL MONITOR
+
+```
+GET  http://18.228.14.96:5678/webhook/sl-monitor-get
+POST http://18.228.14.96:5678/webhook/sl-monitor-set
+POST http://18.228.14.96:5678/webhook/sl-monitor-reset
+
+Campos: { positionSide, slPrice, qty, side, entryPrice, initialSL,
+          stage, tp, leverage, finalScore, openedAt, aiRegime, bestPrice }
+```
+
+---
+
+## BUGS CORREGIDOS
 
 | Bug | Fix |
 |-----|-----|
-| intelligenceSignal N/A | Agente de Mercado consulta endpoint y pasa en marketContext |
-| NO OPERAR no ajustaba score | `hasAdjustment` reemplazó condición `!== 'NEUTRAL'` |
-| intelAdjFinal no llegaba a Build Trade Alert | Position Sizer ahora lo pasa en return |
-| LATE_TREND bloqueaba SHORTs bajistas | `lateTrendBlocks` con excepción SHORT+BEARISH |
-| scan_events vacío | INSERT solo en rechazos post-AI, no en bloqueos macro |
-| Desync Trailing/SL Monitor | `setSLWithRetry` + dashboard solo si SL_SET exitoso |
-| bestPrice se perdía en SET | `Guardar Estado` preserva bestPrice existente |
-| EDGE en bucle infinito | Macro cooldown 15min via dashboard + state.macroCooldowns |
-| scoreSignal no generaba SHORTs | RSI 20-30 → 15pts (era 8), umbral reducido 35pts con 1.5x |
-| AI API error 400 aprobaba trades | confidence_adjustment -50 en catch de error |
-| PnL $0 en TIME_EXIT | Posiciones antiguas sin openedAt — próximas funcionan bien |
-| ENUM TIME_EXIT no existía | ALTER TABLE trade_closes MODIFY close_reason ENUM(... TIME_EXIT) |
+| intelligenceSignal N/A | Agente de Mercado consulta endpoint |
+| NO OPERAR sin ajuste | hasAdjustment reemplazó `!=='NEUTRAL'` |
+| intelAdjFinal sin llegar a Alert | Position Sizer lo pasa en return |
+| LATE_TREND bloqueaba SHORTs | lateTrendBlocks con excepción SHORT+BEARISH |
+| EDGE en bucle por macro | macroCooldowns 15min state + dashboard |
+| Desync Trailing/SL Monitor | setSLWithRetry + dashboard solo si exitoso |
+| bestPrice se perdía | Guardar Estado preserva bestPrice |
+| Pocos SHORTs generados | RSI fix + umbral 35pts con 1.5x |
+| AI error 400 aprobaba | confidence_adjustment=-50 en catch |
+| Posiciones fantasma | Health check en Monitor SL Global x3 |
+| Cooldowns se limpiaban | Bug corregido Aggregate Best Setup |
+| TIME_EXIT no en ENUM | ALTER TABLE trade_closes |
+| Position Sizer1 sin intelAdjFinal | Agregado al return |
 
 ---
 
-## Preferencias de Delcon
+## PREFERENCIAS
 
-- Código completo y listo para pegar — nunca parcial
+- Código **completo** listo para pegar — nunca parcial
 - Verificar con output real antes de siguiente cambio
-- Español en mensajes Telegram
-- Hora CR (UTC-6) en cooldowns y mensajes
-- Arquitectura modular — cambios en un nodo no deben romper otros
+- Español en Telegram, hora CR (UTC-6)
+- Modular — cambios en un nodo no rompen otros
 
 ---
 
-## Referencias Adicionales
+## REFERENCIAS
 
-Para detalles completos de cada nodo, ver:
-- `references/nodos-principales.md` — código completo de nodos críticos
-- `references/mensajes-telegram.md` — formato de mensajes Build Trade Alert y Skip
-- `references/db-schema.md` — estructura de tablas MariaDB
+- `references/workflows/main-nodes.md` — Código JS completo de todos los nodos
+- `references/workflows/sl-monitor-code.md` — Código SL Monitor completo
+- `references/workflows/trailing-manager-code.md` — Código Trailing Manager completo
+- `references/db-schema.md` — Schema DB + queries útiles
+- `references/nodos-principales.md` — Resumen lógica por nodo

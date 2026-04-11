@@ -177,8 +177,14 @@
       "bases:Create new base": false
     }
   },
-  "active": "4ca767faf0245938",
+  "active": "bbe51b2e9b35fc4f",
   "lastOpenFiles": [
+    "trading-bot/references/workflows/trailing-manager-code.md",
+    "trading-bot/references/workflows/sl-monitor-code.md",
+    "trading-bot/references/workflows/main-nodes.md",
+    "trading-bot/references/workflows",
+    "trading-bot/workflows",
+    "trading-bot/New folder",
     "trading-bot/references/nodos-principales.md",
     "trading-bot/references/db-schema.md",
     "trading-bot/SKILL.md",
