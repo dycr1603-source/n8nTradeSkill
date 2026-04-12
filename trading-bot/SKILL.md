@@ -250,6 +250,7 @@ Campos: { positionSide, slPrice, qty, side, entryPrice, initialSL,
 | Cooldowns se limpiaban | Bug corregido Aggregate Best Setup |
 | TIME_EXIT no en ENUM | ALTER TABLE trade_closes |
 | Position Sizer1 sin intelAdjFinal | Agregado al return |
+| Símbolos chinos en scanner | Filtro /^[A-Z0-9]+$/.test(t.symbol) excluye caracteres no-ASCII como 币安人生USDT |
 
 ---
 

@@ -388,6 +388,7 @@ const base = (Array.isArray(tickers) ? tickers : [])
     t.symbol.endsWith('USDT') &&
     !t.symbol.includes('_') &&
     !t.symbol.includes('1000') &&
+    /^[A-Z0-9]+$/.test(t.symbol) &&
     !EXCLUDED_SYMBOLS.includes(t.symbol) &&
     !openSymbols.includes(t.symbol) &&
     parseFloat(t.quoteVolume || 0) >= MIN_VOL &&
