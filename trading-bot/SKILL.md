@@ -202,6 +202,16 @@ catch(e){ aiResult.confidence_adjustment = -50; }
 
 ---
 
+## UPDATE 2026-04-15 (RE-ENTRY + COOLDOWN)
+
+Parche operativo agregado en `nodos-corregidos-2026-04-15/`:
+
+- Bloqueo duro en AI Market Context (con y sin imagen) para no procesar simbolos en `openSymbols`.
+- Guardrail en Execute Trade que verifica `positionRisk` y bloquea si el simbolo ya tiene posicion abierta.
+- Cooldown de simbolo unificado a **60 minutos** al cerrar operacion en SL Monitor.
+
+---
+
 ## ENDPOINTS DASHBOARD
 
 ```
