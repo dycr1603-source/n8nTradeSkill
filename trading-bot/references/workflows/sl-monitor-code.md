@@ -1,5 +1,8 @@
 # Código Completo — SL Monitor
 
+> Estado: referencia histórica ampliada. Puede contener ejemplos legacy.
+> Para producción actual usar primero `../estado-productivo-2026-04-15.md` y `../../nodos-corregidos-2026-04-15/SL_Monitor_Code_FIXED_2026-04-15.js`.
+
 ## Leer Estado
 
 ```javascript

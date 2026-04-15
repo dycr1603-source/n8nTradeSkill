@@ -2,6 +2,9 @@
 
 Todos los nodos de código del workflow principal extraídos directamente del JSON.
 
+> Estado: referencia histórica ampliada. Puede contener IP pública legacy y fragmentos previos.
+> Para despliegue actual usar primero `../estado-productivo-2026-04-15.md` y `../../nodos-corregidos-2026-04-15/`.
+
 ## Risk Guard
 
 ```javascript

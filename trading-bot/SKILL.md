@@ -9,7 +9,8 @@ description: >
   RSI, EMA, 4H, fallbacks, Position Sizer, Execute Trade, Build Trade Alert,
   Build AI Skip Message, Post-Trade Agent, chart-api, workflow, nodo,
   o cualquier código JavaScript para n8n. También activa si el usuario menciona
-  el servidor 18.228.14.96 o pide revisar/modificar cualquier nodo del bot.
+  DNS interno, localhost, desalineación Binance/DB, o pide revisar/modificar
+  cualquier nodo del bot.
   Este skill contiene el código COMPLETO de todos los nodos — úsalo siempre.
 ---
 
@@ -24,9 +25,8 @@ Para código completo de nodos, ve a `references/workflows/`.
 
 | Componente | Valor |
 |-----------|-------|
-| Servidor | `18.228.14.96` |
-| Dashboard | `http://18.228.14.96:3001` |
-| n8n | `http://18.228.14.96:5678` |
+| Dashboard interno | `INTERNAL_DASHBOARD_BASE` (default `http://localhost:3001`) |
+| n8n interno | `http://localhost:5678` (servicio local) |
 | DB | MariaDB `trading_bot` — user `tradingbot` / pass `YOUR_DB_PASSWORD` |
 | Codebase | `/home/admin/chart-api/` |
 | Telegram | `-1003222176229` |
@@ -38,6 +38,15 @@ Binance API_KEY:    YOUR_BINANCE_API_KEY
 Binance API_SECRET: YOUR_BINANCE_API_SECRET
 Anthropic Key:      YOUR_ANTHROPIC_API_KEY
 ```
+
+---
+
+## ORDEN DE CARGA (CRÍTICO PARA OTRAS AI)
+
+1. Leer primero `references/estado-productivo-2026-04-15.md`.
+2. Si necesitas pegar nodos actualizados, usar `nodos-corregidos-2026-04-15/`.
+3. Usar `references/workflows/*.md` solo como histórico/contexto ampliado.
+4. No confiar en IPs públicas hardcodeadas; preferir endpoints internos/env vars.
 
 ---
 
@@ -140,7 +149,7 @@ Normal        → size=1.0
 ## INTELIGENCIA αтεгυм
 
 ```
-GET http://18.228.14.96:3001/intelligence/signal
+GET {INTERNAL_DASHBOARD_BASE}/intelligence/signal
 Señales: LONG, SHORT, NEUTRAL, NO OPERAR
 Ajustes: NO_OPERAR_alta=-10, media=-6, baja=-2(→0 si conf=baja)
          conflict_high=-12, medium=-7, low=-3
@@ -175,7 +184,8 @@ Solo: stage=INITIAL + nunca tocó ganancia (bestPrice≈entry)
 12h en pérdida → SL 50% más cerca (slDist*0.50)
 20h en pérdida → TIME_EXIT (cierre forzado)
 
-Cooldowns: TP=30min | SL=15min | TIME_EXIT=60min | Macro=15min
+Cooldown por cierre de símbolo: 60min (unificado).
+Macro cooldown (rechazos por contexto): 15min.
 ```
 
 ---
@@ -233,9 +243,9 @@ DELETE /trade/:symbol
 ## WEBHOOKS SL MONITOR
 
 ```
-GET  http://18.228.14.96:5678/webhook/sl-monitor-get
-POST http://18.228.14.96:5678/webhook/sl-monitor-set
-POST http://18.228.14.96:5678/webhook/sl-monitor-reset
+GET  http://localhost:5678/webhook/sl-monitor-get
+POST http://localhost:5678/webhook/sl-monitor-set
+POST http://localhost:5678/webhook/sl-monitor-reset
 
 Campos: { positionSide, slPrice, qty, side, entryPrice, initialSL,
           stage, tp, leverage, finalScore, openedAt, aiRegime, bestPrice }
@@ -261,6 +271,8 @@ Campos: { positionSide, slPrice, qty, side, entryPrice, initialSL,
 | TIME_EXIT no en ENUM | ALTER TABLE trade_closes |
 | Position Sizer1 sin intelAdjFinal | Agregado al return |
 | Símbolos chinos en scanner | Filtro /^[A-Z0-9]+$/.test(t.symbol) excluye caracteres no-ASCII como 币安人生USDT |
+| Reentrada en símbolo abierto | Bloqueo en AI Market Context + validación en Execute Trade contra positionRisk |
+| Cooldown corto tras cierre | Cooldown de símbolo unificado a 60 minutos |
 
 ---
 
@@ -275,6 +287,8 @@ Campos: { positionSide, slPrice, qty, side, entryPrice, initialSL,
 
 ## REFERENCIAS
 
+- `references/estado-productivo-2026-04-15.md` — memoria operativa completa y estado real productivo
+- `nodos-corregidos-2026-04-15/` — versión recomendada para pegar en n8n
 - `references/workflows/main-nodes.md` — Código JS completo de todos los nodos
 - `references/workflows/sl-monitor-code.md` — Código SL Monitor completo
 - `references/workflows/trailing-manager-code.md` — Código Trailing Manager completo

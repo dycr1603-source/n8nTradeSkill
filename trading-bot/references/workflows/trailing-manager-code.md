@@ -1,5 +1,8 @@
 # Código Completo — Trailing Manager
 
+> Estado: referencia histórica ampliada. Puede contener endpoints legacy hardcodeados.
+> Para operación actual priorizar configuración con endpoints internos (`localhost`/env vars).
+
 ## Trailing Manager Code
 
 ```javascript
