@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Resumen Operativo del Bot - 2026-04-25</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --page: #ffffff;
+      --text: #171717;
+      --muted: #5f6368;
+      --border: #d9dde7;
+      --accent: #1f6feb;
+      --good: #15803d;
+      --warn: #b45309;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, Arial, sans-serif;
+      line-height: 1.55;
+    }
+    .page {
+      width: min(900px, calc(100vw - 32px));
+      margin: 24px auto;
+      background: var(--page);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 40px 48px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.06);
+    }
+    h1, h2, h3 { line-height: 1.2; margin: 0 0 12px; }
+    h1 { font-size: 34px; margin-bottom: 8px; }
+    h2 {
+      font-size: 22px;
+      margin-top: 28px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+    }
+    h3 { font-size: 17px; margin-top: 18px; }
+    p, li { font-size: 14px; }
+    p.meta {
+      color: var(--muted);
+      margin-top: 0;
+      margin-bottom: 18px;
+    }
+    ul { margin: 10px 0 10px 20px; }
+    li { margin: 5px 0; }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: #fbfcff;
+      margin: 14px 0;
+    }
+    .good { color: var(--good); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    code {
+      background: #f0f3f8;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+    }
+    @media print {
+      body { background: white; }
+      .page {
+        width: auto;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 0;
+      }
+      h2 { page-break-after: avoid; }
+      .card { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1>Resumen Operativo del Bot</h1>
+    <p class="meta">
+      Fecha: 2026-04-25 | Sistema: n8nTradeSkill | Formato listo para imprimir o exportar a PDF
+    </p>
+
+    <div class="card">
+      <strong>Resumen ejecutivo:</strong> el bot fue endurecido para reducir entradas tardias, bloquear reentradas del mismo simbolo, evitar operar cuando la IA cae en fallback y exigir mas confluencia antes de abrir una posicion.
+    </div>
+
+    <h2>1. Hallazgos principales</h2>
+    <ul>
+      <li>Ultimos 7 dias recientes: <code>24 trades</code>, <code>-35.05 USDT</code>, <code>29.2%</code> de acierto.</li>
+      <li>Semana previa estable: <code>37 trades</code>, <code>+8.25 USDT</code>, <code>51.4%</code> de acierto.</li>
+      <li>Simulacion espejo: el rendimiento invertido sugeria que el problema era de timing y aprobacion, no solo de direccion literal.</li>
+    </ul>
+
+    <h2>2. Causa raiz</h2>
+    <p>
+      La degradacion vino principalmente de una politica de aprobacion demasiado permisiva: thresholds bajos en contextos alineados, alivios historicos excesivos, filtros RSI relajados y demasiada tolerancia a entradas de continuacion tardia.
+    </p>
+
+    <h2>3. Como trabaja el bot ahora</h2>
+    <ul>
+      <li>Usa <code>RECOVERY_MODE = true</code>.</li>
+      <li>Bloquea simbolos ya abiertos.</li>
+      <li>Bloquea aprobacion si la IA cae en fallback.</li>
+      <li>Usa threshold dinamico segun macro, 4H y cantidad de posiciones abiertas.</li>
+      <li>Penaliza o bloquea RSI extremo, volumen extremo, contradiccion 4H y entradas tardias.</li>
+      <li>Cuando hay imagen, usa reglas adicionales para <code>LATE_TREND</code> y <code>PARABOLIC</code>.</li>
+    </ul>
+
+    <h2>4. Filtros y decisiones</h2>
+    <h3>Kill switch</h3>
+    <p>Se controla por <code>N8N_TRADING_DISABLED=1</code>.</p>
+
+    <h3>Reentrada</h3>
+    <p>Si un simbolo ya esta abierto en Binance, el bot lo omite para evitar duplicacion accidental.</p>
+
+    <h3>RSI</h3>
+    <ul>
+      <li>Sin imagen: LONG peligroso si <code>RSI &gt; 70</code>, SHORT peligroso si <code>RSI &lt; 30</code>.</li>
+      <li>Con imagen: LONG peligroso si <code>RSI &gt; 82</code>, SHORT peligroso si <code>RSI &lt; 25</code>.</li>
+    </ul>
+
+    <h3>Vision</h3>
+    <ul>
+      <li><code>PARABOLIC</code>: bloqueo inmediato.</li>
+      <li><code>LATE_TREND</code>: solo se permite si pasa un gate de score + volumen.</li>
+      <li><code>EARLY_TREND</code>: puede apoyar la aprobacion.</li>
+    </ul>
+
+    <h2>5. Escenarios tipicos</h2>
+    <div class="card">
+      <strong class="good">Escenario favorable:</strong> SHORT con macro BEARISH, 4H CONFIRMS, RSI no extremo, sin volumen anormal y sesgo IA consistente.
+    </div>
+    <div class="card">
+      <strong class="warn">Escenario bloqueado:</strong> LONG contra macro BEARISH, o setup con <code>LATE_TREND</code> sin gate suficiente, o RSI demasiado extendido.
+    </div>
+
+    <h2>6. Riesgos que siguen existiendo</h2>
+    <ul>
+      <li>La capa de screenshots/chart puede fallar por Puppeteer.</li>
+      <li>La IA externa puede responder lento o imperfecto.</li>
+      <li>Mercados demasiado rapidos pueden degradar incluso un filtro correcto.</li>
+    </ul>
+
+    <h2>7. Que deberia verse ahora</h2>
+    <ul>
+      <li>Menos trades.</li>
+      <li>Menos reentradas accidentales.</li>
+      <li>Mas rechazos explicables.</li>
+      <li>Mejor trazabilidad con <code>decisionAudit</code>.</li>
+    </ul>
+
+    <h2>8. Monitoreo recomendado</h2>
+    <ul>
+      <li>Win rate total.</li>
+      <li>PnL diario.</li>
+      <li>LONG vs SHORT.</li>
+      <li>Frecuencia de <code>AI fallback bloqueado</code>.</li>
+      <li>Resultados por <code>4H CONFIRMS</code>, <code>NEUTRAL</code> y <code>CONTRADICTS</code>.</li>
+    </ul>
+
+    <h2>9. Conclusion</h2>
+    <p>
+      El bot quedo orientado a recuperacion: menos agresivo, mas explicable y mucho menos dispuesto a perseguir continuaciones malas. La mejora futura ideal no es aflojar thresholds a ciegas, sino agregar filtros explicables con VWAP, EMA spread y estadistica historica por contexto.
+    </p>
+  </main>
+</body>
+</html>
